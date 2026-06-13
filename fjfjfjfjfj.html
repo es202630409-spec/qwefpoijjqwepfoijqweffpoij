@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>외계 행성 탐사 종합 시뮬레이터 - 그래프 개선판</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', -apple-system, sans-serif;
+            background-color: #0d0f14;
+            color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 { 
+            color: #00f2fe; 
+            margin: 0 0 5px 0; 
+            font-size: 24px; 
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0,242,254,0.2); 
+        }
+        .subtitle {
+            color: #707e94;
+            font-size: 13px;
+            margin-bottom: 20px;
+        }
+        
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-width: 850px;
+            width: 100%;
+        }
+        
+        .panel {
+            background: linear-gradient(145deg, #161920, #1b1f2a);
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            border: 1px solid #2d3548;
+        }
+        
+        .panel-title { 
+            color: #00f2fe; 
+            font-size: 15px; 
+            font-weight: bold;
+            margin-top: 0; 
+            margin-bottom: 15px; 
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .panel-title::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 14px;
+            background-color: #00f2fe;
+            border-radius: 2px;
+        }
+        
+        canvas {
+            background-color: #04060a;
+            border-radius: 10px;
+            display: block;
+            margin: 0 auto;
+            border: 1px solid #1e2330;
+        }
+        
+        .status-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .status-box {
+            background: #10121a;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            text-align: center;
+            border: 1px solid #1e2330;
+        }
+        .status-box span { font-weight: bold; }
+        .text-blue { color: #38bdf8; }
+        .text-red { color: #f87171; }
+        .text-yellow { color: #facc15; }
+        .text-gray { color: #94a3b8; }
+        
+        .controls-wrapper {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        .sub-control-panel {
+            background: #10121a;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #1e2330;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .sub-panel-header {
+            font-size: 13px;
+            font-weight: bold;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #2d3548;
+            margin-bottom: 4px;
+        }
+        .color-star { color: #ffd166; }
+        .color-planet { color: #ff6b6b; }
+        
+        .control-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .control-label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #94a3b8;
+        }
+        .control-label-row font {
+            color: #00f2fe;
+            font-weight: bold;
+        }
+        
+        input[type="range"] { 
+            width: 100%; 
+            height: 5px;
+            background: #2d3548;
+            border-radius: 3px;
+            outline: none;
+            accent-color: #00f2fe;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #00f2fe;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>외계 행성 탐사 종합 시뮬레이터</h1>
+    <div class="subtitle">모든 천체 물리 파라미터 및 가상 시간(시뮬레이션 속도) 제어 통합 대시보드</div>
+
+    <div class="main-container">
+        
+        <div class="panel">
+            <div class="panel-title">실시간 망원경 가시선 (시선 방향: 아래쪽 ↓)</div>
+            <canvas id="spaceCanvas" width="810" height="180"></canvas>
+            
+            <div class="status-container">
+                <div class="status-box">🔭 식현상 상태: <span id="eclipseStatus" class="text-yellow">-</span></div>
+                <div class="status-box">📡 시선속도 상태: <span id="rvStatus" class="text-blue">-</span></div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title">관측 데이터 분석 그래프 (Light Curve & Radial Velocity)</div>
+            <!-- 그래프 높이를 260으로 조금 더 키워서 시원하게 보이도록 변경 -->
+            <canvas id="dynamicGraph" width="810" height="260"></canvas>
+            
+            <div class="controls-wrapper">
+                <div class="sub-control-panel">
+                    <div class="sub-panel-header color-star">☀️ 중심별 (주성/항성) 제어</div>
+                    
+                    <div class="control-item">
+                        <div class="control-label-row">
+                            <span>Mass (항성 질량)</span>
+                            <font id="starMassVal">-</font>
+                        </div>
+                        <input type="range" id="starMass" min="0.5" max="3.0" step="0.1" value="1.0">
+                    </div>
+                    
+                    <div class="control-item">
+                        <div class="control-label-row">
+                            <span>Radius (항성 크기)</span>
+                            <font id="starSizeVal">-</font>
+                        </div>
+                        <input type="range" id="starSize" min="20" max="50" value="32">
+                    </div>
+                    
+                    <div class="control-item">
+                        <div class="control-label-row">
+                            <span>Temperature (항성 표면 온도)</span>
+                            <font id="starTempVal">-</font>
+                        </div>
+                        <input type="range" id="starTemp" min="3000" max="11000" step="500" value="5500">
+                    </div>
+                </div>
+
+                <div class="sub-control-panel">
+                    <div class="sub-panel-header color-planet">🪐 외계 행성 & 궤도 제어 (+속도)</div>
+                    
+                    <div class="control-item">
+                        <div class="control-label-row">
+                            <span>Mass (행성 질량)</span>
+                            <font id="compMassVal">-</font>
+                        </div>
+                        <input type="range" id="compMass" min="5" max="80" value="30">
+                    </div>
+                    
+                    <div class="control-item">
+                        <div class="control-label-row">
+                            <span>Radius (행성 크기)</span>
+                            <font id="compSizeVal">-</font>
+                        </div>
+                        <input type="range" id="companionSize" min="8" max="25" value="14">
+                    </div>
+                    
+                    <div class="control-item">
+                        <div class="control-label-row">
+                            <span>Orbit (공전 궤도 반지름)</span>
+                            <font id="orbitVal">-</font>
+                        </div>
+                        <input type="range" id="orbitRadius" min="65" max="140" value="105">
+                    </div>
+                    
+                    <div class="control-item">
+                        <div class="control-label-row">
+                            <span>Inclination (궤도 기울기 i)</span>
+                            <font id="incVal">-</font>
+                        </div>
+                        <input type="range" id="orbitInclination" min="0" max="90" value="90">
+                    </div>
+
+                    <div class="control-item" style="border-top: 1px solid #2d3548; padding-top: 8px; margin-top: 2px;">
+                        <div class="control-label-row">
+                            <span style="color: #00f2fe; font-weight: bold;">⏱️ 시뮬레이션 배속 (시간 흐름)</span>
+                            <font id="simSpeedVal">-</font>
+                        </div>
+                        <input type="range" id="simSpeed" min="0" max="3" step="0.2" value="1">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <script>
+        (function() {
+            let time = 0;
+            const historyLength = 400; // 그래프에 기록되는 포인트 개수
+
+            const spaceCanvas = document.getElementById('spaceCanvas');
+            const spaceCtx = spaceCanvas.getContext('2d');
+            const dynamicGraph = document.getElementById('dynamicGraph');
+            const dgCtx = dynamicGraph.getContext('2d');
+
+            const starMassSlider = document.getElementById('starMass');
+            const starSizeSlider = document.getElementById('starSize');
+            const starTempSlider = document.getElementById('starTemp');
+
+            const compMassSlider = document.getElementById('compMass');
+            const compSizeSlider = document.getElementById('companionSize');
+            const orbitRadiusSlider = document.getElementById('orbitRadius');
+            const incSlider = document.getElementById('orbitInclination');
+            const simSpeedSlider = document.getElementById('simSpeed'); 
+
+            const starMassVal = document.getElementById('starMassVal');
+            const starSizeVal = document.getElementById('starSizeVal');
+            const starTempVal = document.getElementById('starTempVal');
+            const compMassVal = document.getElementById('compMassVal');
+            const compSizeVal = document.getElementById('compSizeVal');
+            const orbitVal = document.getElementById('orbitVal');
+            const incVal = document.getElementById('incVal');
+            const simSpeedVal = document.getElementById('simSpeedVal'); 
+
+            const rvStatusEl = document.getElementById('rvStatus');
+            const eclipseStatusEl = document.getElementById('eclipseStatus');
+
+            let lightCurveHistory = [];
+            let rvHistory = [];
+
+            function getTemperatureColor(kelvin) {
+                if (kelvin < 3800) return '#ff5252'; 
+                if (kelvin < 5200) return '#ff9f43'; 
+                if (kelvin < 6000) return '#fff3cd'; 
+                if (kelvin < 7500) return '#f5f6fa'; 
+                if (kelvin < 10000) return '#dff9fb'; 
+                return '#48dbfb'; 
+            }
+
+            function drawStar(ctx, x, y, r, color, glow) {
+                ctx.save();
+                if (glow && r > 0) {
+                    ctx.shadowBlur = r * 1.6;
+                    ctx.shadowColor = color;
+                }
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(x, y, Math.max(0.5, r), 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            function animate() {
+                const m1 = parseFloat(starMassSlider.value);
+                const r1 = parseFloat(starSizeSlider.value);
+                const t1 = parseInt(starTempSlider.value);
+
+                const m2 = parseFloat(compMassSlider.value);
+                const r2 = parseFloat(compSizeSlider.value);
+                const orbitR = parseFloat(orbitRadiusSlider.value);
+                const inclination = parseFloat(incSlider.value) * (Math.PI / 180);
+                const speedMultiplier = parseFloat(simSpeedSlider.value); 
+
+                // UI 수치 업데이트
+                starMassVal.innerText = m1.toFixed(1) + " M_☉";
+                starSizeVal.innerText = r1 + " px";
+                starTempVal.innerText = t1 + " K";
+                compMassVal.innerText = m2 + " M_J";
+                compSizeVal.innerText = r2 + " px";
+                orbitVal.innerText = orbitR + " AU";
+                incVal.innerText = incSlider.value + "°";
+                
+                if (speedMultiplier === 0) {
+                    simSpeedVal.innerText = "일시정지 (⏸️)";
+                } else {
+                    simSpeedVal.innerText = speedMultiplier.toFixed(1) + " 배속";
+                }
+
+                // 궤도 및 회전 속도 연산
+                const angularSpeed = Math.sqrt(m1 / (orbitR * orbitR * orbitR)) * speedMultiplier;
+                time += angularSpeed * 125; 
+
+                spaceCtx.clearRect(0, 0, spaceCanvas.width, spaceCanvas.height);
+                
+                const sysCX = spaceCanvas.width / 2;
+                const sysCY = spaceCanvas.height / 2;
+                
+                const compX = sysCX + Math.sin(time) * orbitR;
+                const compY = sysCY + Math.cos(time) * orbitR * Math.cos(inclination);
+                const zIndex = Math.cos(time); 
+
+                // 중심별의 미세한 흔들림 궤도 반경
+                const starOrbitR = orbitR * ((m2 / 1000) / m1) * 6; 
+                const starX = sysCX - Math.sin(time) * starOrbitR;
+                const starY = sysCY - Math.cos(time) * starOrbitR * Math.cos(inclination);
+
+                spaceCtx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+                spaceCtx.beginPath();
+                spaceCtx.ellipse(sysCX, sysCY, orbitR, orbitR * Math.cos(inclination), 0, 0, Math.PI*2);
+                spaceCtx.stroke();
+
+                // === 1. 식현상 기하학 연산 ===
+                let currentBrightness = 1.0;
+                const distBetween = Math.hypot(compX - starX, compY - starY);
+
+                if (distBetween < (r1 + r2) && Math.abs(compY - starY) < r1) {
+                    const overlapRatio = Math.min(1, (r1 + r2 - distBetween) / (r2 * 2));
+                    if (zIndex > 0) { 
+                        const areaRatio = (r2 * r2) / (r1 * r1);
+                        currentBrightness = 1.0 - (areaRatio * 1.5 * overlapRatio * Math.sin(inclination));
+                        eclipseStatusEl.innerText = "주극소 식현상 (행성이 광원 차단)";
+                        eclipseStatusEl.className = "text-red";
+                    } else { 
+                        currentBrightness = 0.985; 
+                        eclipseStatusEl.innerText = "부극소 (행성 자체 광도 차단)";
+                        eclipseStatusEl.className = "text-blue";
+                    }
+                } else {
+                    eclipseStatusEl.innerText = "일정함 (식 없음)";
+                    eclipseStatusEl.className = "text-gray";
+                }
+                if (currentBrightness < 0.3) currentBrightness = 0.3;
+
+                if (speedMultiplier > 0 || lightCurveHistory.length === 0) {
+                    lightCurveHistory.push(currentBrightness);
+                }
+
+                // === 2. 시선속도(RV) 연산 개선 ===
+                // 진폭(Amplitude)을 행성 질량(m2)이 크고, 중심별 질량(m1)이 작고, 궤도(orbitR)가 좁을수록 증폭시킴
+                // 그래프에서 역동적으로 변하도록 상수(1.0)를 곱하여 스케일링
+                const rvAmplitude = (m2 / Math.pow(m1, 0.8)) * Math.sqrt(100 / orbitR) * Math.sin(inclination) * 1.0;
+                const radialVelocity = -Math.sin(time) * rvAmplitude;
+                
+                if (speedMultiplier > 0 || rvHistory.length === 0) {
+                    rvHistory.push(radialVelocity);
+                }
+
+                if (Math.abs(radialVelocity) < 2.0) {
+                    rvStatusEl.innerText = "접선 방향 이동 (편이 거의 없음)";
+                    rvStatusEl.className = "text-gray";
+                } else if (radialVelocity > 0) {
+                    rvStatusEl.innerText = `항성 후퇴 중 (+${radialVelocity.toFixed(1)} m/s, 적색편이🔴)`;
+                    rvStatusEl.className = "text-red";
+                } else {
+                    rvStatusEl.innerText = `항성 접근 중 (${radialVelocity.toFixed(1)} m/s, 청색편이🔵)`;
+                    rvStatusEl.className = "text-blue";
+                }
+
+                // 색상 및 별 렌더링
+                let baseStarColor = getTemperatureColor(t1);
+                const companionColor = '#ff6b6b'; 
+                let renderStarColor = baseStarColor;
+                
+                if (radialVelocity > 5) renderStarColor = '#ffb3b3'; // 적색편이 시각화
+                if (radialVelocity < -5) renderStarColor = '#b3d9ff'; // 청색편이 시각화
+
+                if (zIndex <= 0) drawStar(spaceCtx, compX, compY, r2, companionColor, false);
+                drawStar(spaceCtx, starX, starY, r1, renderStarColor, true);
+                if (zIndex > 0) drawStar(spaceCtx, compX, compY, r2, companionColor, false);
+
+                // 기록 배열 길이 유지
+                if (lightCurveHistory.length > historyLength) lightCurveHistory.shift();
+                if (rvHistory.length > historyLength) rvHistory.shift();
+
+                // === 3. 그래프 드로잉 (축, 라벨 등 전면 개선) ===
+                dgCtx.clearRect(0, 0, dynamicGraph.width, dynamicGraph.height);
+                
+                const padX = 55; // Y축 라벨을 위한 왼쪽 여백
+                const padRight = 20;
+                const plotW = dynamicGraph.width - padX - padRight;
+                
+                const lcCenterY = 30; // 광도 곡선 1.0 기준선 Y좌표
+                const rvCenterY = 180; // 시선 속도 0 기준선 Y좌표
+
+                // 텍스트 기본 설정
+                dgCtx.font = '10px sans-serif';
+                dgCtx.textAlign = 'right';
+                dgCtx.textBaseline = 'middle';
+
+                // --- A. 광도 곡선(Light Curve) 축 그리기 ---
+                dgCtx.strokeStyle = '#1e293b'; // 어두운 눈금선
+                dgCtx.lineWidth = 1;
+                [1.0, 0.8, 0.6].forEach(val => {
+                    let y = lcCenterY + (1.0 - val) * 160; 
+                    dgCtx.fillStyle = '#94a3b8';
+                    dgCtx.fillText(val.toFixed(2), padX - 8, y);
+                    dgCtx.beginPath(); dgCtx.moveTo(padX, y); dgCtx.lineTo(padX + plotW, y); dgCtx.stroke();
+                });
+                
+                dgCtx.fillStyle = '#00f2fe';
+                dgCtx.textAlign = 'left';
+                dgCtx.font = 'bold 11px sans-serif';
+                dgCtx.fillText("⭐ 상대 광도 (Brightness Level)", padX + 10, 15);
+
+                // --- B. 시선속도(Radial Velocity) 축 그리기 ---
+                dgCtx.textAlign = 'right';
+                [-60, 0, 60].forEach(val => {
+                    let y = rvCenterY - val; 
+                    dgCtx.fillStyle = '#94a3b8';
+                    let label = val > 0 ? "+" + val : val;
+                    dgCtx.fillText(label, padX - 8, y);
+                    dgCtx.beginPath(); dgCtx.moveTo(padX, y); dgCtx.lineTo(padX + plotW, y); dgCtx.stroke();
+                });
+
+                dgCtx.fillStyle = '#ff4d4d';
+                dgCtx.textAlign = 'left';
+                dgCtx.font = 'bold 11px sans-serif';
+                dgCtx.fillText("📈 시선속도 (Radial Velocity, m/s)", padX + 10, 115);
+
+                // 두 그래프를 분리하는 중앙 경계선
+                dgCtx.strokeStyle = '#334155';
+                dgCtx.lineWidth = 2;
+                dgCtx.beginPath(); dgCtx.moveTo(padX, 100); dgCtx.lineTo(padX + plotW, 100); dgCtx.stroke();
+
+                // --- C. 광도 곡선 데이터 렌더링 ---
+                dgCtx.strokeStyle = '#00f2fe';
+                dgCtx.lineWidth = 2.5;
+                dgCtx.beginPath();
+                for(let i=0; i<lightCurveHistory.length; i++) {
+                    const x = padX + (plotW / historyLength) * i;
+                    // 밝기 1.0 -> y=30, 밝기 0.6 -> y=94
+                    const y = lcCenterY + (1.0 - lightCurveHistory[i]) * 160; 
+                    if(i===0) dgCtx.moveTo(x, y); else dgCtx.lineTo(x, y);
+                }
+                dgCtx.stroke();
+
+                // --- D. 시선속도 데이터 렌더링 ---
+                dgCtx.strokeStyle = '#ff4d4d';
+                dgCtx.lineWidth = 2.5;
+                dgCtx.beginPath();
+                for(let i=0; i<rvHistory.length; i++) {
+                    const x = padX + (plotW / historyLength) * i;
+                    // 값이 60이면 y는 120, -60이면 y는 240
+                    const y = rvCenterY - rvHistory[i]; 
+                    if(i===0) dgCtx.moveTo(x, y); else dgCtx.lineTo(x, y);
+                }
+                dgCtx.stroke();
+
+                // --- 현재 지점(오른쪽 끝) 표시하는 포인트(점) 렌더링 ---
+                if (lightCurveHistory.length > 0 && rvHistory.length > 0) {
+                    const currentX = padX + plotW;
+                    const currentLcY = lcCenterY + (1.0 - lightCurveHistory[lightCurveHistory.length-1]) * 160;
+                    const currentRvY = rvCenterY - rvHistory[rvHistory.length-1];
+
+                    // 빛 그래프 끝점
+                    dgCtx.fillStyle = '#ffffff';
+                    dgCtx.beginPath(); dgCtx.arc(currentX, currentLcY, 4, 0, Math.PI*2); dgCtx.fill();
+                    
+                    // RV 그래프 끝점
+                    dgCtx.beginPath(); dgCtx.arc(currentX, currentRvY, 4, 0, Math.PI*2); dgCtx.fill();
+                }
+
+                requestAnimationFrame(animate);
+            }
+
+            animate();
+        })();
+    </script>
+</body>
+</html>
